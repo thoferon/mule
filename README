@@ -1,0 +1,50 @@
+Mule is a simple tool to launch a program in different directories and pass
+signals to the created children processes. It can be used to run an application
+which exists in several versions.
+
+Imagine versions of SuperApp are deployed in /var/superapp/VERSION/bin/superapp
+with their respective configuration file in /var/superapp/VERSION/config.json.
+You can run all the versions by calling:
+
+$ mule /var/superapp bin/superapp config.json
+
+To send, say, SIGINT to all processes, send it to the Mule process.
+
+At the moment, Mule passes the following signals:
+
+* SIGTERM
+* SIGQUIT
+* SIGINT
+* SIGHUP
+
+# Options
+
+To run the program with specified user and group, use -u or --user and
+-g or --group. To detach the process, use -b or --backgound. Finally, -n or
+--name overwrites the name of the program.
+
+These options are useful when using Mule in a rc script or similar. Remember
+that rc.subr is sending SIGKILL to the processes which cannot be caught. You
+would need to write a slightly more complex script with something like the
+following code. See rc.subr(8).
+
+#!/bin/sh
+
+daemon="/usr/local/bin/mule -u www -g www -n mule-superapp -b \
+        /var/superapp bin/superapp config.json"
+
+. /etc/rc.d/rc.subr
+
+pexp="mule-superapp"
+
+rc_reload=NO
+
+rc_stop() {
+    pkill -SIGTERM -f "^${pexp}"
+    (pkill -0 -f "^${pexp}" && sleep 1 && pkill -SIGKILL -f "^${pexp}") || true
+    if pkill -0 -f "^${pexp}"; then
+        exit 1
+    fi
+}
+
+rc_cmd $1
